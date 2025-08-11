@@ -1,34 +1,30 @@
-name: Deploy Vite App to EC2
+name: Deploy Vite App with PM2
 
 on:
   push:
     branches:
-      - main  # or your deployment branch
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Install Node
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      # 3️⃣ Install dependencies & build
       - name: Install dependencies
         run: npm install
 
       - name: Build Vite app
         run: npm run build
 
-      # 4️⃣ Deploy to EC2
-      - name: Copy files to EC2
+      - name: Copy build to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -37,14 +33,14 @@ jobs:
           source: "dist/*"
           target: "~/my-vite-app"
 
-      # 5️⃣ Restart Nginx on EC2
-      - name: Restart Nginx
+      - name: Start app with PM2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            sudo rm -rf /var/www/html/*
-            sudo cp -r ~/my-vite-app/* /var/www/html/
-            sudo systemctl restart nginx
+            cd ~/my-vite-app
+            pm2 delete vite-app || true
+            pm2 serve . 3000 --name vite-app --spa
+            pm2 save
